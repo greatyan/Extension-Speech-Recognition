@@ -15,10 +15,12 @@ class BrowserSttProvider {
 
     settings = {
         language: '',
+        streaming_mode: 'off'
     };
 
     defaultSettings = {
         language: 'en-US',
+        streaming_mode: 'off'
     };
 
     processTranscriptFunction = null;
@@ -81,6 +83,11 @@ class BrowserSttProvider {
             <option value="zh-HK">zh-HK: Chinese (Hond Kong)</option> \
             <option value="zh-TW">zh-TW: Chinese (Taiwan)</option> \
         </select> \
+        <span>Streaming Mode</span> </br> \
+        <select id="speech_recognition_browser_streaming_mode"> \
+            <option value="on">ON</option> \
+            <option value="off">OFF</option> \
+        </select> \
         ';
         return html;
     }
@@ -88,7 +95,9 @@ class BrowserSttProvider {
     onSettingsChange() {
         // Used when provider settings are updated from UI
         this.settings.language = $('#speech_recognition_browser_provider_language').val();
+        this.settings.streaming_mode = $('#speech_recognition_browser_streaming_mode').val();
         console.debug(DEBUG_PREFIX + 'Change language to', this.settings.language);
+        console.debug(DEBUG_PREFIX + 'Change streaming mode to', this.settings.streaming_mode);
         this.loadSettings(this.settings);
     }
 
@@ -165,13 +174,24 @@ class BrowserSttProvider {
         const button = $('#microphone_button');
 
         let listening = false;
+        let streaming_mode = (this.settings.streaming_mode == 'on');
         button.off('click').on('click', function () {
             if (listening) {
-                recognition.stop();
+                try {
+                  recognition.stop();
+                }
+                catch(e) {
+                  console.debug(DEBUG_PREFIX + ' Failed to start: ' + e);
+                }
             } else {
-                recognition.start();
-            }
-            listening = !listening;
+                try {
+                  recognition.start();
+                }
+                catch(e) {
+                  console.debug(DEBUG_PREFIX + ' Failed to stop: ' + e);
+                }
+           }
+           listening = !listening;
         });
 
         let initialText = '';
@@ -191,7 +211,6 @@ class BrowserSttProvider {
                         if (final.slice(-1) != '.' && final.slice(-1) != '?') final += '.';
                         finalTranscript = final;
                         recognition.abort();
-                        listening = false;
                     }
                     interimTranscript = ' ';
                 } else {
@@ -211,19 +230,27 @@ class BrowserSttProvider {
         };
 
         recognition.onend = function () {
-            listening = false;
-            console.debug(DEBUG_PREFIX + 'recorder stopped');
-            deactivateMicIcon(button);
-
+            console.debug(DEBUG_PREFIX + 'recorder stopped with streaming mode ' + streaming_mode);
             const newText = textarea.val().substring(initialText.length);
             textarea.val(textarea.val().substring(0, initialText.length));
             processTranscript(newText);
-
+            if (listening && streaming_mode ) {
+              console.debug(DEBUG_PREFIX + 'Restart speech recognition in streaming mode.');
+              try {
+                recognition.start();
+              } catch(e) {
+                console.debug(DEBUG_PREFIX + 'Restart failed: ' + e);
+              }
+            } else {
+              listening = false;
+              deactivateMicIcon(button);
+            }
         };
 
         recognition.onstart = function () {
             initialText = textarea.val();
-            console.debug(DEBUG_PREFIX + 'recorder started');
+            console.debug(DEBUG_PREFIX + 'recorder started with streaming mode ' + streaming_mode);
+            listening = true;
             activateMicIcon(button);
 
             if ($('#speech_recognition_message_mode').val() == 'replace') {
