@@ -12,7 +12,8 @@ import { WhisperLocalSttProvider } from './whisper-local.js';
 import { BrowserSttProvider } from './browser.js';
 import { StreamingSttProvider } from './streaming.js';
 import { KoboldCppSttProvider } from './koboldcpp.js';
-import { VAD } from './vad.js'
+import { VAD } from './vad.js';
+import { AzureSttProvider } from './azure-stt.js';
 export { MODULE_NAME };
 export { activateMicIcon, deactivateMicIcon };
 
@@ -31,6 +32,7 @@ let sttProviders = {
     'Whisper (Local)': WhisperLocalSttProvider,
     Vosk: VoskSttProvider,
     Streaming: StreamingSttProvider,
+    Azure: AzureSttProvider,
 };
 
 let sttProvider = null;
@@ -254,7 +256,7 @@ function loadNavigatorAudioRecording() {
 
             mediaRecorder.onstop = async function () {
                 console.debug(DEBUG_PREFIX + 'data available after MediaRecorder.stop() called: ', audioChunks.length, ' chunks');
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+                const audioBlob = new Blob(audioChunks, { type: 'audio/ogg;codecs=opus' });
                 const arrayBuffer = await audioBlob.arrayBuffer();
 
                 // Use AudioContext to decode our array buffer into an audio buffer
@@ -335,8 +337,12 @@ function loadSttProvider(provider) {
         $('#microphone_button').show();
     }
 
-    const nonStreamingProviders = ['Vosk', 'Whisper (OpenAI)', 'Whisper (Extras)', 'Whisper (Local)', 'KoboldCpp'];
+    const nonStreamingProviders = ['Vosk', 'Whisper (OpenAI)', 'Whisper (Extras)', 'Whisper (Local)', 'KoboldCpp', 'Azure'];
     if (nonStreamingProviders.includes(sttProviderName)) {
+        if (sttProviderName == 'Azure') {
+            // Azure has its own Language list
+            $('#speech_recognition_language_div').hide();
+        }
         sttProvider.loadSettings(extension_settings.speech_recognition[sttProviderName]);
         loadNavigatorAudioRecording();
         $('#microphone_button').show();
